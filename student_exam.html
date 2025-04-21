@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Exam Page</title>
+    <script>
+        let timeLeft = {{ duration | tojson }} * 60;  // Convert to seconds
+
+        // Timer update function
+        function updateTimer() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            document.getElementById("timer").innerText = minutes + "m " + seconds + "s";
+            if (timeLeft > 0 && !examEnded) {
+                timeLeft--;
+                setTimeout(updateTimer, 1000);
+            } else if (timeLeft === 0 && !examEnded) {
+                alert("Time's up! Submitting exam...");
+                submitExam();
+            }
+        }
+
+        let examEnded = false;
+
+        // Handle "Submit Exam" button
+        function submitExam() {
+            examEnded = true;
+            fetch("/submit_exam", {
+                method: "POST",
+                body: JSON.stringify({
+                    token: "{{ token }}", 
+                    student_name: "{{ session['name'] }}",
+                    student_email: "{{ session['email'] }}",
+                }),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert("Exam submitted successfully!");
+                window.location.href = "/exam_completed";  // Redirect after submission
+            });
+        }
+
+        window.onload = updateTimer;  // Start the timer when the page loads
+
+        // Tab switch detection
+        document.addEventListener("visibilitychange", function() {
+            if (document.hidden) {
+                fetch("/send_alert", {
+                    method: "POST",
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        token: "{{ token }}",
+                        alert: "Tab switch detected by student."
+                    })
+                });
+                alert("Tab switch is not allowed!");
+            }
+        });
+
+        window.onblur = () => {
+            fetch("/send_alert", {
+                method: "POST",
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    token: "{{ token }}",
+                    alert: "Window focus lost."
+                })
+            });
+            alert("Switching window/tab is not allowed!");
+        };
+
+        // Prevent right-click, copying, and other tricks
+        document.addEventListener("contextmenu", e => e.preventDefault());
+    </script>
+</head>
+<body>
+    <h2>Online Exam</h2>
+    <p>Time Left: <span id="timer"></span></p>
+    <button onclick="submitExam()">Submit Exam</button>
+</body>
+</html>
